@@ -25,6 +25,22 @@ import win32gui
 
 import torch
 
+from pythonosc import osc_server
+from pythonosc import dispatcher
+
+
+# Get the tracked OSC
+trackedLocation = [0,0,10]
+
+def saveTrackedLocation(unused_addr, args, x, y, z):
+	global trackedLocation
+	trackedLocation = [x, y, z]
+
+dis = dispatcher.Dispatcher()
+dis.map("/rtls", saveTrackedLocation)
+server = osc_server.OSCUDPServer(("127.0.0.1",8282), dis)
+
+
 # Global variables
 mousePressed = False
 mousePressedLocation = (0,0)
@@ -74,20 +90,23 @@ brushSize = 20
 
 def scrollevent(event):
 	global brushSize
-	if event.button == 'up':
+	if event.button == 'down':
 		brushSize = max(brushSize - 10, 5)
 	else:
 		brushSize = min(brushSize + 10, 300)
 
 selectedSemantic = 0
 
+fig = plt.figure()
+
 def onkey(event):
-	global selectedSemantic, semantics
+	global selectedSemantic, semantics, fig
 	try:
 		val = int(event.key)
 		if val >= 0 and val <= 10:
 			selectedSemantic = val
 			print("Selected {:s}".format(semantics[selectedSemantic][1]))
+			fig.suptitle(semantics[selectedSemantic][1])
 			return
 	except:
 		None
@@ -98,16 +117,20 @@ def onkey(event):
 		if val >= 0 and val <= 10:
 			selectedSemantic = val+10
 			print("Selected {:s}".format(semantics[selectedSemantic][1]))
+			fig.suptitle(semantics[selectedSemantic][1])
 	except:
 		None
 
 
 def main():
 
-	global mousePressed, mousePressedLocation, mousePressedOffset, lastMouseLocation, brushSize, selectedSemantic, semantics
+	global mousePressed, mousePressedLocation, mousePressedOffset, lastMouseLocation, brushSize, selectedSemantic, semantics, fig, trackedLocation
+
+
+	# server.serve_forever()
 
 	# Create a figure to draw to and connect the mouse functions
-	fig = plt.figure()
+	fig.suptitle("",fontsize=30)
 	fig.canvas.mpl_connect('button_press_event', onpress)
 	fig.canvas.mpl_connect('button_release_event', onrelease)
 	fig.canvas.mpl_connect('motion_notify_event', mousemove)
@@ -144,24 +167,20 @@ def main():
 	# While the program is running, generate imagery from input
 	while True:
 
+		# if (trackedLocation[2] < 0.2):
+
+
+
+
 		# Update the mouse location
 		if mousePressed:
 
-			# Doesn't work:
-			# Get current location
-			# cursorPos = win32gui.GetCursorPos()
-			# mouseLocation = [cursorPos[0] - mousePressedLocation[0] + mousePressedOffset[0], cursorPos[1] - mousePressedLocation[1] + mousePressedOffset[1]]
-			
-			# Print the last mouse location
-			# print(lastMouseLocation)
-
-			# Draw any mouse movements to the input image
-			# inData['label'][0,0] = 0
-
+			# Draw a circle with the correct semantic label
 			cv2.circle(tmpImg[0,0], (int(lastMouseLocation[0]),int(lastMouseLocation[1])), brushSize, (semantics[selectedSemantic][0]-1), -1)
 			inData['label'] = torch.tensor(tmpImg)
 
-			# data_i['label']
+
+
 
 		# Run a forward pass through the model to "infer" the output image
 		generated = model(inData, mode='inference')
